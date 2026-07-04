@@ -1,0 +1,40 @@
+# Shared standards manifest
+
+Lists which standards are shared (canonical in `n3ary/standards/`) vs local-only (in the consumer repo's own `docs/standards/`).
+
+## Shared (canonical in this repo)
+
+Every standard below is vendored into each consumer repo's `docs/standards/` via the sync workflow.
+
+| Standard | Purpose |
+|---|---|
+| [agent-worktrees.md](agent-worktrees.md) | When AI agents may use git worktrees; always ask first. |
+| [core-principles.md](core-principles.md) | Simplicity first, reuse before write, clean architecture. |
+| [diagramming.md](diagramming.md) | Mermaid + GFM admonitions — visual conventions. |
+| [documentation.md](documentation.md) | Where docs live, how to write them, what doesn't belong. |
+| [issue-plan-lifecycle.md](issue-plan-lifecycle.md) | Plans are short-lived work artifacts on a branch, not in `main`; issues are long-lived records of intent. |
+| [naming.md](naming.md) | Files, directories, code identifiers. |
+| [testing.md](testing.md) | Scope, location, size targets. |
+| [verification.md](verification.md) | Verify before stating; confidence in answers. |
+| [version-management.md](version-management.md) | Bump `package.json#version` on PR, not on merge. |
+
+## Local-only (per consumer repo)
+
+### `neary`
+
+- [`docs/standards/feed-agnostic.md`](https://github.com/n3ary/app/blob/main/docs/standards/feed-agnostic.md) — the "no per-feed exceptions" rule is neary-specific. The producer repos (`neary-gtfs`, `cluj-napoca-gtfs-adapter`) are upstream of neary's data and don't apply.
+
+### `neary-gtfs`
+
+None today. Future feed-pipeline-specific standards (e.g. CSV-encoding rules, ETag-skip semantics) belong in `neary-gtfs/docs/standards/`.
+
+### `cluj-napoca-gtfs-adapter`
+
+None today. Future Cluj-specific reconciliation rules belong in `cluj-napoca-gtfs-adapter/docs/standards/`.
+
+## Adding a standard
+
+1. **Cross-repo?** → put it in this repo's `standards/` directory. Add it to the table above. The sync workflow will vendore it to every consumer repo on the next push.
+2. **Consumer-specific?** → put it in that consumer repo's `docs/standards/`. Don't add it to this manifest.
+
+Renaming / removing a standard: delete or rename the file here, update the table above, push. The sync workflow will create vendor PRs that delete or rename the vendored copies in each consumer repo.
