@@ -1,0 +1,13 @@
+# OS / editor noise
+.DS_Store
+.idea/
+.vscode/
+
+# Local build / vendored copies
+node_modules/
+deploy/
+
+# Per-user AI editor state
+.kiro/
+.claude/
+.kilo/worktrees/
