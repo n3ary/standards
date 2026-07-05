@@ -39,12 +39,14 @@ const CONSUMERS = [
     vendorDir: 'docs/standards',
     skip: new Set(),
   },
-  // TODO(n3ary/gtfs-adapters): add a CONSUMERS entry for the gtfs-adapters
-  // monorepo. Per-adapter vendoring lives under
-  // adapters/<feed>/docs/standards/ rather than at the repo root, so the
-  // vendorDir will need to be either per-adapter or the repo root with
-  // adapters/ listed as a no-vendor-dir. Until then, drift in gtfs-adapters
-  // is detected but not auto-fixed by the publisher's sync loop.
+  {
+    // gtfs-adapters is a monorepo (adapters/<feed>/) but standards vendored
+    // here are repo-wide. Any per-adapter standard overrides live and have
+    // their lifecycle inside the adapter - they are not vendored centrally.
+    repo: 'n3ary/gtfs-adapters',
+    vendorDir: 'docs/standards',
+    skip: new Set(),
+  },
 ];
 
 function repoSlug() {
