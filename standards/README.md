@@ -1,6 +1,6 @@
 # Standards (shared)
 
-This directory is the canonical source of truth for **repo-agnostic standards** in the neary ecosystem. The 3 consumer repos (`neary`, `neary-gtfs`, `cluj-napoca-gtfs-adapter`) **vendor** these files into their own `docs/standards/` and a sync CI keeps the copies current.
+This directory is the canonical source of truth for **repo-agnostic standards** in the n3ary org. The 3 consumer repos (`n3ary/app`, `n3ary/gtfs`, `n3ary/gtfs-adapters`) **vendor** these files into their own `docs/standards/` and a sync CI keeps the copies current.
 
 See [SHARED-STANDARDS.md](SHARED-STANDARDS.md) for the manifest: which standard is shared, which stays local to a consumer repo, and which repos have local-only exemptions.
 
@@ -13,7 +13,7 @@ n3ary/standards/standards/<name>.md   ← canonical (this repo)
        ▼
 neary/docs/standards/<name>.md             ← vendored copy (consumer)
 neary-gtfs/docs/standards/<name>.md        ← vendored copy
-cluj-napoca-gtfs-adapter/docs/standards/<name>.md  ← vendored copy
+n3ary/gtfs-adapters/adapters/cluj-napoca/docs/standards/<name>.md  ← vendored copy
 ```
 
 Each vendored copy carries a header so it's clear where it came from:

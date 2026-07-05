@@ -12,7 +12,7 @@ flowchart LR
   publisher["n3ary/standards<br/>(canonical)"]
   vendor["scripts/<br/>vendor-standards.mjs"]
   sync["sync-standards<br/>workflow"]
-  consumers["Consumer repos<br/>n3ary/app · n3ary/gtfs<br/>n3ary/gtfs-adapters<br/>n3ary/cluj-napoca-gtfs-adapter<br/>…"]
+  consumers["Consumer repos<br/>n3ary/app · n3ary/gtfs<br/>n3ary/gtfs-adapters<br/>…"]
   drift["check-standards-drift<br/>workflow (per consumer)"]
   vendorDir["docs/standards/*.md<br/>(vendored copy with sync header)"]
 
@@ -28,7 +28,7 @@ flowchart LR
 | Role | Repo | Owns |
 | --- | --- | --- |
 | Publisher (canonical) | `n3ary/standards` | `standards/*.md`, `scripts/vendor-standards.mjs`, `.github/workflows/sync-standards.yml` |
-| Consumer | `n3ary/app`, `n3ary/gtfs`, `n3ary/gtfs-adapters`, `n3ary/cluj-napoca-gtfs-adapter`, and any future repo | `docs/standards/*.md` (vendored copies) + a `.github/workflows/check-standards-drift.yml` |
+| Consumer | `n3ary/app`, `n3ary/gtfs`, `n3ary/gtfs-adapters`, and any future repo | `docs/standards/*.md` (vendored copies) + a `.github/workflows/check-standards-drift.yml` (or drift folded into `pr-validation.yml`) |
 
 ## End-to-end vendor round-trip
 

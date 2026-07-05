@@ -39,11 +39,12 @@ const CONSUMERS = [
     vendorDir: 'docs/standards',
     skip: new Set(),
   },
-  {
-    repo: 'n3ary/cluj-napoca-gtfs-adapter',
-    vendorDir: 'docs/standards',
-    skip: new Set(),
-  },
+  // TODO(n3ary/gtfs-adapters): add a CONSUMERS entry for the gtfs-adapters
+  // monorepo. Per-adapter vendoring lives under
+  // adapters/<feed>/docs/standards/ rather than at the repo root, so the
+  // vendorDir will need to be either per-adapter or the repo root with
+  // adapters/ listed as a no-vendor-dir. Until then, drift in gtfs-adapters
+  // is detected but not auto-fixed by the publisher's sync loop.
 ];
 
 function gitHeadShort() {

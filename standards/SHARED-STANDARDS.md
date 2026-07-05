@@ -22,15 +22,15 @@ Every standard below is vendored into each consumer repo's `docs/standards/` via
 
 ### `neary`
 
-- [`docs/standards/feed-agnostic.md`](https://github.com/n3ary/app/blob/main/docs/standards/feed-agnostic.md) — the "no per-feed exceptions" rule is neary-specific. The producer repos (`neary-gtfs`, `cluj-napoca-gtfs-adapter`) are upstream of neary's data and don't apply.
+- [`docs/standards/feed-agnostic.md`](https://github.com/n3ary/app/blob/main/docs/standards/feed-agnostic.md) — the "no per-feed exceptions" rule is app-specific. The producer repos (`gtfs`, `gtfs-adapters`) are upstream of app's data and don't apply.
 
 ### `neary-gtfs`
 
 None today. Future feed-pipeline-specific standards (e.g. CSV-encoding rules, ETag-skip semantics) belong in `neary-gtfs/docs/standards/`.
 
-### `cluj-napoca-gtfs-adapter`
+### `gtfs-adapters`
 
-None today. Future Cluj-specific reconciliation rules belong in `cluj-napoca-gtfs-adapter/docs/standards/`.
+None today. Future per-feed-adapter-specific standards (e.g. CSV encoding rules for one feed) belong in `gtfs-adapters/adapters/<feed>/docs/standards/` rather than at the repo root.
 
 ## Adding a standard
 
