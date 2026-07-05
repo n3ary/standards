@@ -26,7 +26,6 @@ identical except for the `gh`/auth idiom they use. Examples:
 - `n3ary/app/.github/workflows/check-standards-drift.yml`
 - `n3ary/gtfs/.github/workflows/check-standards-drift.yml`
 - `n3ary/gtfs-adapters/.github/workflows/pr-validation.yml` (drift is folded into the validate job, with the same check logic)
-- `n3ary/cluj-napoca-gtfs-adapter/.github/workflows/check-standards-drift.yml`
 
 The lifecycle is the same regardless of which file hosts the check: trigger
 on `pull_request`, fail if any `docs/standards/*.md` is older than
