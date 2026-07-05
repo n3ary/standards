@@ -46,8 +46,56 @@ const CONSUMERS = [
   },
 ];
 
-function gitHeadShort() {
-  return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: __dirname, encoding: 'utf8' }).trim();
+function repoSlug() {
+  // Derive the owner/repo for the current git checkout — used to call
+  // the GitHub API for SHA resolution. Works in any clone (local or CI).
+  const url = execFileSync(
+    'git',
+    ['-C', __dirname, 'remote', 'get-url', 'origin'],
+    { encoding: 'utf8' },
+  ).trim();
+  const m = url.match(/[:/]([^/:]+\/[^/.]+?)(?:\.git)?$/);
+  if (!m) throw new Error(`Could not parse owner/repo from origin URL: ${url}`);
+  return m[1];
+}
+
+function lastStandardsSha() {
+  // The "where did this content come from" label baked into each
+  // vendored file's sync header. We deliberately resolve it via the
+  // GitHub API as the SHA of the most recent commit on main that
+  // touched any file under standards/, NOT as HEAD of main.
+  //
+  // Why: drift-check (n3ary/actions/.github/workflows/check-standards-drift.yml)
+  // compares this label against the same API call. Tracking HEAD would
+  // create false-positive drift on every non-standards commit on
+  // n3ary/standards/main (e.g. a docs/ or .github/ change) — none of
+  // which actually moved the standards content, but the SHA would.
+  //
+  // Falls back to HEAD if the API isn't usable (e.g. running outside
+  // the standards repo, or in a test) so the helper never throws
+  // during a routine vendor run.
+  let slug;
+  try {
+    slug = repoSlug();
+  } catch {
+    return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: __dirname, encoding: 'utf8' }).trim();
+  }
+  try {
+    const sha = execFileSync(
+      'gh',
+      [
+        'api',
+        `repos/${slug}/commits?sha=main&path=standards&per_page=1`,
+        '--jq', '.[0].sha',
+      ],
+      { cwd: __dirname, encoding: 'utf8' },
+    ).trim();
+    if (!sha) throw new Error(`API returned empty SHA for ${slug}@main touching path=standards`);
+    return sha.slice(0, 7);
+  } catch (err) {
+    console.warn(`[warn] lastStandardsSha() fell back to HEAD: ${err.message}`);
+    return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: __dirname, encoding: 'utf8' }).trim();
+  }
 }
 
 function todayIsoDate() {
@@ -74,7 +122,7 @@ function runGh(args, opts = {}) {
 }
 
 function vendorLocalMode(targetDir) {
-  const sha = gitHeadShort();
+  const sha = lastStandardsSha();
   const date = todayIsoDate();
   rmSync(targetDir, { recursive: true, force: true });
   mkdirSync(targetDir, { recursive: true });
@@ -88,7 +136,7 @@ function vendorLocalMode(targetDir) {
 }
 
 function prMode() {
-  const sha = gitHeadShort();
+  const sha = lastStandardsSha();
   const date = todayIsoDate();
   const branchName = `chore/vendor-standards-${sha}`;
 

@@ -4,7 +4,15 @@ on:
   push:
     branches: [main]
     paths:
+      # `standards/**` is the obvious case — vendored content changes.
+      # `scripts/**` covers the vendor script itself: any fix to
+      # vendor-standards.mjs (e.g. changing how sync-header SHAs are
+      # resolved) needs a re-vendor across consumers to take effect.
+      # Without `scripts/**` here, a script fix would land on main
+      # silently but the consumer sync headers wouldn't update until
+      # the next standards/ change happened to also fire a sync.
       - 'standards/**'
+      - 'scripts/**'
 
 # The workflow needs to clone consumer repos and push branches to
 # them. Use a PAT or the workflow's GITHUB_TOKEN with appropriate
