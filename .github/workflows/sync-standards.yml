@@ -34,17 +34,33 @@ jobs:
 
       - name: Vendor standards + open PRs in each consumer repo
         env:
-          # Cross-repo PR creation typically requires a PAT that has
-          # write access to each consumer repo. The default
-          # GITHUB_TOKEN is scoped to this repo only. Configure a
-          # secret called STANDARDS_SYNC_TOKEN (PAT with `repo` scope
-          # and access to the consumer repos).
-          GH_TOKEN: ${{ secrets.STANDARDS_SYNC_TOKEN }}
+          # Cross-repo PR creation needs a PAT scoped to each consumer
+          # repo. STANDARDS_SYNC_TOKEN should be a fine-grained PAT with
+          # Contents:write + Pull requests:write on n3ary/*.
+          #
+          # Falls back to GITHUB_TOKEN when STANDARDS_SYNC_TOKEN is
+          # unset. With GITHUB_TOKEN alone, same-repo API calls (the
+          # SHA lookup in lastStandardsSha()) still work, but cross-repo
+          # `gh repo clone` and `gh pr create` will fail per consumer.
+          # When that happens the script logs `[<consumer>] failed: …`
+          # per consumer and the job still exits 0 — no partial state.
+          #
+          # To re-enable auto-vendor across consumers, set
+          # STANDARDS_SYNC_TOKEN at
+          # https://github.com/n3ary/standards/settings/secrets/actions
+          # (Settings → Secrets and variables → Actions → New repository
+          # secret).
+          GH_TOKEN: ${{ secrets.STANDARDS_SYNC_TOKEN || secrets.GITHUB_TOKEN }}
         run: node scripts/vendor-standards.mjs
 
       - name: Summary
         if: always()
         run: |
           echo "## Standards sync" >> $GITHUB_STEP_SUMMARY
-          echo "Triggered by push to standards/ on main." >> $GITHUB_STEP_SUMMARY
-          echo "Ran \`node scripts/vendor-standards.mjs\`." >> $GITHUB_STEP_SUMMARY
+          echo "Triggered by push to standards/ or scripts/ on main." >> $GITHUB_STEP_SUMMARY
+          if [ -z "${{ secrets.STANDARDS_SYNC_TOKEN }}" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**WARNING:** STANDARDS_SYNC_TOKEN is not set on this repo. Cross-repo auto-vendor is disabled — the script logs a \`failed: gh: …\` per consumer. Set the secret at https://github.com/n3ary/standards/settings/secrets/actions to re-enable fan-out." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Vendor-standards script ran with STANDARDS_SYNC_TOKEN configured." >> $GITHUB_STEP_SUMMARY
+          fi
