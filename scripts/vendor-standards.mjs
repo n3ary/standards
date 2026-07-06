@@ -176,6 +176,17 @@ function prMode() {
       execFileSync('git', ['-C', tmpDir, 'config', 'user.email', 'n3ary-standards-bot@users.noreply.github.com']);
       execFileSync('git', ['-C', tmpDir, 'config', 'user.name',  'n3ary-standards-bot']);
 
+      // Set per-clone credential helper so `git push` (and any other
+      // git remote operation) authenticates with the same token `gh` is
+      // using. Without this, `git push` falls back to prompting for
+      // a username/password, which fails on Actions with
+      // "could not read Username for 'https://github.com'".
+      // The helper `!gh auth git-credential` calls back into gh to
+      // produce the credential, using whatever GH_TOKEN is in the
+      // environment. Per-clone (not global) so we don't pollute the
+      // user's git config when this script is run locally.
+      execFileSync('git', ['-C', tmpDir, 'config', 'credential.helper', '!gh auth git-credential']);
+
       // Write vendored files
       mkdirSync(join(tmpDir, consumer.vendorDir), { recursive: true });
       let anyChanged = false;

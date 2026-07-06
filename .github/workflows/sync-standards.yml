@@ -43,6 +43,18 @@ jobs:
           git config --global user.email "n3ary-standards-bot@users.noreply.github.com"
           git config --global user.name  "n3ary-standards-bot"
 
+      - name: Configure git to use GH_TOKEN for push
+        # `gh repo clone` honours GH_TOKEN, but native `git push` doesn't
+        # — without a credential helper, the push fails with
+        # "fatal: could not read Username for 'https://github.com'".
+        # `gh auth setup-git` wires git's credential helper to the
+        # GH_TOKEN env var (works for both PATs and OAuth), so the
+        # subsequent `git push` inside the cloned consumer repos
+        # authenticates with the same token.
+        env:
+          GH_TOKEN: ${{ secrets.STANDARDS_SYNC_TOKEN || secrets.GITHUB_TOKEN }}
+        run: gh auth setup-git
+
       - name: Vendor standards + open PRs in each consumer repo
         env:
           # Cross-repo PR creation needs a PAT scoped to each consumer
