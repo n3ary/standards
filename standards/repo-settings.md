@@ -28,7 +28,7 @@ Configured in repo settings → General → Pull Requests.
 | Allow squash merging | on | Default merge method. |
 | Allow rebase merging | on | Optional fast-forward path. |
 | Allow merge commits | **off** | With linear history enforced, merge commits can no longer create a non-linear graph — but the button still shows. Off makes the UI match the intent. |
-| Always suggest updating pull request branches | off | Default. |
+| Always suggest updating pull request branches | on | Reduces conflicts when the base branch advances; pairs with linear history. |
 | Automatically delete head branches | on | Keeps the branch list clean. |
 | Allow auto-merge | on | Lets CI repos auto-merge PRs when checks pass. |
 
@@ -79,7 +79,7 @@ The branch protection, merge strategy, and Dependabot / secret scanning toggles 
 
 1. Create the repo.
 2. Apply the branch protection from the table above (`PUT /repos/{owner}/{repo}/branches/main/protection`).
-3. Apply the merge strategy from the table above (`PATCH /repos/{owner}/{repo}` with `delete_branch_on_merge`, `allow_squash_merge`, `allow_rebase_merge`, `allow_merge_commit: false`, `allow_auto_merge: true`).
+3. Apply the merge strategy from the table above (`PATCH /repos/{owner}/{repo}` with `delete_branch_on_merge`, `allow_squash_merge`, `allow_rebase_merge`, `allow_merge_commit: false`, `allow_auto_merge: true`, `allow_update_branch: true`).
 4. Drop `.github/dependabot.yml` (per the ecosystem rule) and commit it.
 5. Enable Dependabot alerts + security updates + secret scanning on the repo (`PATCH /repos/{owner}/{repo}` with `security_and_analysis.*`).
 
