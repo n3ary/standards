@@ -32,6 +32,17 @@ jobs:
           fetch-depth: 1
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Configure git identity for vendored commits
+        # GitHub-hosted runners ship with no global user.name / user.email,
+        # so `git commit` inside the cloned consumer repos fails with
+        # "Author identity unknown" unless we set them. The script also
+        # sets these per-clone as defence-in-depth; this step is the
+        # belt-and-braces that keeps a one-off bug from breaking the
+        # whole fan-out silently.
+        run: |
+          git config --global user.email "n3ary-standards-bot@users.noreply.github.com"
+          git config --global user.name  "n3ary-standards-bot"
+
       - name: Vendor standards + open PRs in each consumer repo
         env:
           # Cross-repo PR creation needs a PAT scoped to each consumer
@@ -42,25 +53,46 @@ jobs:
           # unset. With GITHUB_TOKEN alone, same-repo API calls (the
           # SHA lookup in lastStandardsSha()) still work, but cross-repo
           # `gh repo clone` and `gh pr create` will fail per consumer.
-          # When that happens the script logs `[<consumer>] failed: …`
-          # per consumer and the job still exits 0 — no partial state.
-          #
-          # To re-enable auto-vendor across consumers, set
-          # STANDARDS_SYNC_TOKEN at
-          # https://github.com/n3ary/standards/settings/secrets/actions
-          # (Settings → Secrets and variables → Actions → New repository
-          # secret).
+          # The script writes a per-consumer summary to
+          # $GITHUB_WORKSPACE/vendor-summary.json (and to stdout) that
+          # the Summary step below reads.
           GH_TOKEN: ${{ secrets.STANDARDS_SYNC_TOKEN || secrets.GITHUB_TOKEN }}
+          # Where the script drops the JSON summary the next step reads.
+          # Defaults to /tmp/vendor-standards-summary.json in the script;
+          # we point it at the workspace so the file is easy to find in
+          # the Actions artifacts too.
+          VENDOR_SUMMARY_PATH: ${{ github.workspace }}/vendor-summary.json
         run: node scripts/vendor-standards.mjs
 
       - name: Summary
         if: always()
         run: |
-          echo "## Standards sync" >> $GITHUB_STEP_SUMMARY
-          echo "Triggered by push to standards/ or scripts/ on main." >> $GITHUB_STEP_SUMMARY
-          if [ -z "${{ secrets.STANDARDS_SYNC_TOKEN }}" ]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**WARNING:** STANDARDS_SYNC_TOKEN is not set on this repo. Cross-repo auto-vendor is disabled — the script logs a \`failed: gh: …\` per consumer. Set the secret at https://github.com/n3ary/standards/settings/secrets/actions to re-enable fan-out." >> $GITHUB_STEP_SUMMARY
-          else
-            echo "Vendor-standards script ran with STANDARDS_SYNC_TOKEN configured." >> $GITHUB_STEP_SUMMARY
-          fi
+          {
+            echo "## Standards sync"
+            echo ""
+            echo "Triggered by push to \`standards/\` or \`scripts/\` on main."
+            echo ""
+            if [ ! -f "${{ github.workspace }}/vendor-summary.json" ]; then
+              echo "**No vendor summary produced** — the script crashed before writing ${{ github.workspace }}/vendor-summary.json. Re-run with debug logging to diagnose."
+            else
+              echo "### Per-consumer results"
+              echo ""
+              echo "| consumer | status | detail |"
+              echo "| --- | --- | --- |"
+              jq -r '.results[] | "| \(.consumer) | \(.status) | \(.prUrl // .error // "") |"' "${{ github.workspace }}/vendor-summary.json"
+              opened=$(jq '[.results[] | select(.status == "opened")] | length' "${{ github.workspace }}/vendor-summary.json")
+              up_to_date=$(jq '[.results[] | select(.status == "up-to-date")] | length' "${{ github.workspace }}/vendor-summary.json")
+              failed=$(jq '[.results[] | select(.status == "failed")] | length' "${{ github.workspace }}/vendor-summary.json")
+              total=$(jq '.results | length' "${{ github.workspace }}/vendor-summary.json")
+              echo ""
+              echo "**Totals:** $opened opened, $up_to_date up-to-date, $failed failed (out of $total consumers)"
+              if [ "$failed" -gt 0 ]; then
+                echo ""
+                echo "**WARNING:** $failed consumer(s) failed. The job exits non-zero when this happens — see the step logs for the per-consumer error. Common cause: the \`STANDARDS_SYNC_TOKEN\` PAT is unset, expired, or missing \`Contents: write\` / \`Pull requests: write\` on the failing consumer."
+              fi
+            fi
+            if [ -z "${{ secrets.STANDARDS_SYNC_TOKEN }}" ]; then
+              echo ""
+              echo "**WARNING:** \`STANDARDS_SYNC_TOKEN\` is not set on this repo. Cross-repo auto-vendor is disabled. Set the secret at https://github.com/n3ary/standards/settings/secrets/actions to re-enable fan-out."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
