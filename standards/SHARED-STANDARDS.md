@@ -14,6 +14,7 @@ Every standard below is vendored into each consumer repo's `docs/standards/` via
 | [documentation.md](documentation.md) | Where docs live, how to write them, what doesn't belong. |
 | [issue-plan-lifecycle.md](issue-plan-lifecycle.md) | Plans are short-lived work artifacts on a branch, not in `main`; issues are long-lived records of intent. |
 | [naming.md](naming.md) | Files, directories, code identifiers. |
+| [repo-settings.md](repo-settings.md) | Branch protection, merge strategy, Dependabot, secret scanning — applied to every n3ary repo. |
 | [testing.md](testing.md) | Scope, location, size targets. |
 | [verification.md](verification.md) | Verify before stating; confidence in answers. |
 | [version-management.md](version-management.md) | Bump `package.json#version` on PR, not on merge. |
