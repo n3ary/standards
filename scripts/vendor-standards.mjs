@@ -143,6 +143,15 @@ function prMode() {
   const date = todayIsoDate();
   const branchName = `chore/vendor-standards-${sha}`;
 
+  // Per-run summary written next to the script so the workflow's
+  // Summary step can surface pass/fail counts. The previous version
+  // of this script caught per-consumer errors and exited 0, so a
+  // "success" workflow run could silently vendor zero repos. Reading
+  // this file in the Summary step is the single source of truth for
+  // "did the cross-repo fan-out actually land?".
+  const summaryPath = process.env.VENDOR_SUMMARY_PATH || '/tmp/vendor-standards-summary.json';
+  const summary = { sha, results: [] };
+
   for (const consumer of CONSUMERS) {
     try {
       const filesToVendor = listStandards()
@@ -156,6 +165,16 @@ function prMode() {
       rmSync(tmpDir, { recursive: true, force: true });
       execFileSync('gh', ['repo', 'clone', consumer.repo, tmpDir, '--', '--depth=1'], { stdio: 'pipe' });
       execFileSync('git', ['-C', tmpDir, 'checkout', '-b', branchName]);
+
+      // Set per-clone git identity. GitHub Actions runners ship with no
+      // global user.name / user.email, so `git commit` fails with
+      // "Author identity unknown" unless we set them. The workflow file
+      // also sets these globally as a belt-and-braces; doing it per-clone
+      // here means the script is correct even when run outside Actions
+      // (e.g. for a local `node scripts/vendor-standards.mjs --local ...`
+      // vendor).
+      execFileSync('git', ['-C', tmpDir, 'config', 'user.email', 'n3ary-standards-bot@users.noreply.github.com']);
+      execFileSync('git', ['-C', tmpDir, 'config', 'user.name',  'n3ary-standards-bot']);
 
       // Write vendored files
       mkdirSync(join(tmpDir, consumer.vendorDir), { recursive: true });
@@ -176,6 +195,7 @@ function prMode() {
 
       if (!anyChanged) {
         console.log(`[${consumer.repo}] up-to-date, skipping`);
+        summary.results.push({ consumer: consumer.repo, status: 'up-to-date' });
         rmSync(tmpDir, { recursive: true, force: true });
         continue;
       }
@@ -204,11 +224,22 @@ function prMode() {
       ]).trim();
       console.log(`[${consumer.repo}] opened PR: ${prUrl}`);
 
+      summary.results.push({ consumer: consumer.repo, status: 'opened', prUrl });
       rmSync(tmpDir, { recursive: true, force: true });
     } catch (err) {
       console.error(`[${consumer.repo}] failed: ${err.message}`);
+      summary.results.push({ consumer: consumer.repo, status: 'failed', error: err.message });
     }
   }
+
+  // Write summary for the workflow's Summary step to read.
+  writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
+  // Exit non-zero if ANY consumer failed. The workflow's
+  // `summary.results` check below will see this and surface it in
+  // the run summary; the job also fails the check, so the next push
+  // can't hide a regression in a green run.
+  const anyFailed = summary.results.some((r) => r.status === 'failed');
+  if (anyFailed) process.exit(1);
 }
 
 const args = process.argv.slice(2);
