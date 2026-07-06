@@ -6,10 +6,7 @@ on:
 
 # Shared base PR-validation lives in n3ary/actions. This repo IS
 # the source of n3ary/standards, so it does not vendor them -
-# enable-drift-check stays false. The line-length check covers
-# Markdown content too by default; if it complains about lines
-# in standards/ files (URLs in tables, etc.), the markdown glob
-# in line-length-exclude-globs already excludes *.md.
+# enable-drift-check stays false.
 
 permissions:
   contents: read
