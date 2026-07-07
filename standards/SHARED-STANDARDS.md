@@ -9,6 +9,7 @@ Every standard below is vendored into each consumer repo's `docs/standards/` via
 | Standard | Purpose |
 |---|---|
 | [agent-worktrees.md](agent-worktrees.md) | When AI agents may use git worktrees; always ask first. |
+| [comments.md](comments.md) | Inline comment policy: one-line WHY only; restated prose is deleted, not preserved. |
 | [core-principles.md](core-principles.md) | Simplicity first, reuse before write, clean architecture. |
 | [diagramming.md](diagramming.md) | Mermaid + GFM admonitions — visual conventions. |
 | [documentation.md](documentation.md) | Where docs live, how to write them, what doesn't belong. |
