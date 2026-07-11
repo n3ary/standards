@@ -1,0 +1,9 @@
+{
+  "consumers": {
+    "n3ary/app": {
+      "skip": ["feed-agnostic.md"]
+    },
+    "n3ary/gtfs-publisher": {},
+    "n3ary/gtfs-adapters": {}
+  }
+}
