@@ -1,4 +1,4 @@
-name: Sync Standards
+name: '[sync] standards to consumer repos (on push to main)'
 
 on:
   push:
