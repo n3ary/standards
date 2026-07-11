@@ -24,6 +24,14 @@ permissions:
 
 jobs:
   sync-standards:
+    # Skip sync when the release bot (n3ary-release-bot) is the actor.
+    # The bot's release/calver-* PRs land on main as a squash merge; the
+    # `push` event fires with `github.actor = n3ary-release-bot[bot]`.
+    # The bot would never push a change to `standards/**` or
+    # `scripts/**` (it only bumps `package.json#version`), so this is
+    # defense in depth: the paths filter already excludes bot commits,
+    # but a bot push to a vendored SHA would also be a no-op.
+    if: github.actor != 'n3ary-release-bot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout standards
