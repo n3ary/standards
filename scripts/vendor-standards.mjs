@@ -6,10 +6,14 @@
  * `docs/standards/`, prefixed with a sync header that records the
  * source SHA + date. Opens a vendor PR in each consumer repo.
  *
- * Default mode: opens PRs in the configured consumer repos via `gh`.
+ * Default mode: opens PRs in the dynamically-discovered consumer
+ * repos via `gh`. Consumers are listed in `consumers.json` next to
+ * this script AND must carry the `n3ary-standards-consumer` topic on
+ * the repo. The two signals are intersected — a mismatch is
+ * surfaced in the run summary and fails the build.
  *
  * `--local <dir>` mode: writes the vendored copies into a local
- * directory for inspection (no git operations).
+ * directory for inspection (no git operations, no consumer list).
  *
  * Vendor file format:
  *
@@ -27,27 +31,59 @@ import { execFileSync } from 'node:child_process';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STANDARDS_DIR = join(__dirname, '..', 'standards');
 
-// Consumer repos. Add new repos here.
-const CONSUMERS = [
-  {
-    repo: 'n3ary/app',
-    vendorDir: 'docs/standards',
-    skip: new Set(['feed-agnostic.md']), // local-only — stays in the consumer repo
-  },
-  {
-    repo: 'n3ary/gtfs',
-    vendorDir: 'docs/standards',
-    skip: new Set(),
-  },
-  {
-    // gtfs-adapters is a monorepo (adapters/<feed>/) but standards vendored
-    // here are repo-wide. Any per-adapter standard overrides live and have
-    // their lifecycle inside the adapter - they are not vendored centrally.
-    repo: 'n3ary/gtfs-adapters',
-    vendorDir: 'docs/standards',
-    skip: new Set(),
-  },
-];
+// Consumer discovery is two-layered:
+//   1. consumers.json (next to this script) declares the canonical list
+//      of consumer repos and any per-consumer overrides (vendorDir,
+//      skip). Adding a new consumer is a one-line PR here.
+//   2. Each consumer repo must carry the CONSUMER_TOPIC topic. That's
+//      the runtime opt-in signal — the script lists org repos with
+//      that topic and intersects with the JSON. A repo in the JSON
+//      without the topic (or vice versa) is reported as a
+//      misconfiguration in the summary; the build fails so the gap
+//      can't hide in a green run.
+const CONSUMERS_JSON = join(__dirname, 'consumers.json');
+const CONSUMER_TOPIC = 'n3ary-standards-consumer';
+const DEFAULT_VENDOR_DIR = 'docs/standards';
+
+function loadConsumerConfig() {
+  if (!existsSync(CONSUMERS_JSON)) {
+    throw new Error(
+      `Missing ${CONSUMERS_JSON}. Create it (mirror existing entries) before running prMode.`
+    );
+  }
+  const raw = JSON.parse(readFileSync(CONSUMERS_JSON, 'utf8')).consumers || {};
+  // Normalize per-consumer shape so prMode never has to defend against
+  // missing fields. A repo with no overrides gets default config:
+  // vendorDir = DEFAULT_VENDOR_DIR, skip = {}.
+  const out = {};
+  for (const [repo, overrides] of Object.entries(raw)) {
+    out[repo] = {
+      vendorDir: (overrides && overrides.vendorDir) || DEFAULT_VENDOR_DIR,
+      skip: new Set((overrides && overrides.skip) || []),
+    };
+  }
+  return out;
+}
+
+function listConsumerRepos() {
+  // Public-org repo listing — works without auth for orgs whose repos
+  // are public. `gh api` uses whatever GH_TOKEN is in the env, which
+  // in CI is the workflow's token. For a public org, the call
+  // succeeds either way.
+  //
+  // Returns an array of "owner/repo" strings. Pagination is ignored:
+  // n3ary has well under 100 repos and there's no expectation of
+  // scaling past that. If we ever do, switch to the Link-header
+  // pagination pattern gh's `paginate` flag already handles.
+  const owner = repoSlug().split('/')[0];
+  const out = runGh([
+    'api',
+    `orgs/${owner}/repos?per_page=100`,
+    '--jq',
+    `.[] | select(.topics | index("${CONSUMER_TOPIC}")) | .full_name`,
+  ]).trim();
+  return out ? out.split('\n').filter(Boolean) : [];
+}
 
 function repoSlug() {
   // Derive the owner/repo for the current git checkout — used to call
@@ -151,7 +187,35 @@ function prMode() {
   const summaryPath = process.env.VENDOR_SUMMARY_PATH || '/tmp/vendor-standards-summary.json';
   const summary = { sha, results: [] };
 
-  for (const consumer of CONSUMERS) {
+  const config = loadConsumerConfig();
+  const topicRepos = listConsumerRepos();
+  const topicSet = new Set(topicRepos);
+
+  // Report misconfigurations BEFORE the vendor loop so the summary
+  // surfaces the full gap, not just the half it noticed while vendoring.
+  // - `misconfigured`: in consumers.json but missing the topic (no
+  //   runtime opt-in).
+  // - `unconfigured`: has the topic but not in consumers.json (no
+  //   per-consumer overrides registered).
+  // Either is a real config gap; the build fails so the next push
+  // can't hide the gap in a green run.
+  for (const repo of Object.keys(config)) {
+    if (!topicSet.has(repo)) {
+      console.error(`[${repo}] in consumers.json but missing topic "${CONSUMER_TOPIC}"`);
+      summary.results.push({ consumer: repo, status: 'misconfigured', error: `missing topic "${CONSUMER_TOPIC}"` });
+    }
+  }
+  for (const repo of topicRepos) {
+    if (!(repo in config)) {
+      console.error(`[${repo}] has topic "${CONSUMER_TOPIC}" but not in consumers.json`);
+      summary.results.push({ consumer: repo, status: 'unconfigured', error: 'not in consumers.json' });
+    }
+  }
+
+  // Actual vendor work. Only consumers in BOTH the JSON and the topic
+  // list get a PR opened.
+  for (const [repo, consumer] of Object.entries(config)) {
+    if (!topicSet.has(repo)) continue; // already reported as misconfigured
     try {
       // Every file under standards/ gets vendored. The shared
       // n3ary/actions drift check (check-standards-drift.yml) iterates
@@ -168,9 +232,9 @@ function prMode() {
       const hasChanges = filesToVendor.length > 0;
 
       // Clone consumer repo to a temp dir
-      const tmpDir = `/tmp/vendor-${consumer.repo.replace('/', '-')}-${sha}`;
+      const tmpDir = `/tmp/vendor-${repo.replace('/', '-')}-${sha}`;
       rmSync(tmpDir, { recursive: true, force: true });
-      execFileSync('gh', ['repo', 'clone', consumer.repo, tmpDir, '--', '--depth=1'], { stdio: 'pipe' });
+      execFileSync('gh', ['repo', 'clone', repo, tmpDir, '--', '--depth=1'], { stdio: 'pipe' });
       execFileSync('git', ['-C', tmpDir, 'checkout', '-b', branchName]);
 
       // Set per-clone git identity. GitHub Actions runners ship with no
@@ -212,8 +276,8 @@ function prMode() {
       }
 
       if (!anyChanged) {
-        console.log(`[${consumer.repo}] up-to-date, skipping`);
-        summary.results.push({ consumer: consumer.repo, status: 'up-to-date' });
+        console.log(`[${repo}] up-to-date, skipping`);
+        summary.results.push({ consumer: repo, status: 'up-to-date' });
         rmSync(tmpDir, { recursive: true, force: true });
         continue;
       }
@@ -234,30 +298,32 @@ function prMode() {
 
       const prUrl = runGh([
         'pr', 'create',
-        '--repo', consumer.repo,
+        '--repo', repo,
         '--base', 'main',
         '--head', branchName,
         '--title', `chore(standards): vendor from n3ary/standards@${sha}`,
         '--body', body,
       ]).trim();
-      console.log(`[${consumer.repo}] opened PR: ${prUrl}`);
+      console.log(`[${repo}] opened PR: ${prUrl}`);
 
-      summary.results.push({ consumer: consumer.repo, status: 'opened', prUrl });
+      summary.results.push({ consumer: repo, status: 'opened', prUrl });
       rmSync(tmpDir, { recursive: true, force: true });
     } catch (err) {
-      console.error(`[${consumer.repo}] failed: ${err.message}`);
-      summary.results.push({ consumer: consumer.repo, status: 'failed', error: err.message });
+      console.error(`[${repo}] failed: ${err.message}`);
+      summary.results.push({ consumer: repo, status: 'failed', error: err.message });
     }
   }
 
   // Write summary for the workflow's Summary step to read.
   writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
-  // Exit non-zero if ANY consumer failed. The workflow's
-  // `summary.results` check below will see this and surface it in
-  // the run summary; the job also fails the check, so the next push
+  // Exit non-zero if ANY consumer failed OR is misconfigured/unconfigured.
+  // The workflow's `summary.results` check below will see this and surface
+  // it in the run summary; the job also fails the check, so the next push
   // can't hide a regression in a green run.
-  const anyFailed = summary.results.some((r) => r.status === 'failed');
-  if (anyFailed) process.exit(1);
+  const anyIssue = summary.results.some(
+    (r) => r.status === 'failed' || r.status === 'misconfigured' || r.status === 'unconfigured',
+  );
+  if (anyIssue) process.exit(1);
 }
 
 const args = process.argv.slice(2);
