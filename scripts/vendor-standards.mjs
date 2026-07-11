@@ -131,7 +131,6 @@ function vendorLocalMode(targetDir) {
   mkdirSync(targetDir, { recursive: true });
 
   for (const file of listStandards()) {
-    if (file === 'README.md' || file === 'SHARED-STANDARDS.md') continue; // manifest + index stay canonical-only
     const original = readFileSync(join(STANDARDS_DIR, file), 'utf8');
     writeFileSync(join(targetDir, file), vendorContent(sha, date, original));
   }
@@ -154,8 +153,16 @@ function prMode() {
 
   for (const consumer of CONSUMERS) {
     try {
+      // Every file under standards/ gets vendored. The shared
+      // n3ary/actions drift check (check-standards-drift.yml) iterates
+      // every `*.md` under the consumer's vendor dir and compares the
+      // sync-header SHA against the latest on this repo's main that
+      // touched standards/. Skipping files here creates permanent drift
+      // noise on the consumer: the file is still present in the
+      // consumer (with an older sync header) and the check sees the
+      // mismatch forever. Only the per-consumer `skip` set (e.g.
+      // n3ary/app's local-only feed-agnostic.md) is honoured.
       const filesToVendor = listStandards()
-        .filter((f) => f !== 'README.md' && f !== 'SHARED-STANDARDS.md')
         .filter((f) => !consumer.skip.has(f));
 
       const hasChanges = filesToVendor.length > 0;
